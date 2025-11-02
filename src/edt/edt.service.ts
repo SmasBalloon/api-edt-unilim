@@ -33,18 +33,11 @@ export class EdtService {
       ]
 
       for (let i = 0; i < Fills.length; i++) {
-        const { x, y, h, w, oc } = Fills[i];
+        const { x, y, oc } = Fills[i];
         if (oc in tableCouleur){
-          const xmin = x;
-          const ymin = y;
-          const xmax = x + w;
-          const ymax = y + h;
-          dataColor.push({ xmin, ymin, xmax, ymax, oc });
+          dataColor.push({ x, y, oc });
         }
       }
-
-      dataColor.sort((a, b) => a.y - b.y);
-      dataColor.sort((a, b) => a.x - b.x);
 
       // console.log("nombre de couleur : ",dataColor.length);
 
@@ -54,9 +47,17 @@ export class EdtService {
         const text = R[0].T
 
         if (/^[RS]\d+\.\d+ - ([a-zA-Z0-9]+|\.) - ([a-zA-Z0-9]+|\.)$/.test(text)) {
-          const result = dataColor.filter((data) => data.xmin <= x && data.xmax >= x && data.ymin <= y && data.ymax >= y);
-          // console.log(text, " : ", result);
-          dataText.push({ x, y, text });
+          const color = dataColor.filter((data) => data.x <= x - 0.204 && data.x >= x - 0.200)
+            /*
+            couleur ~ 0.202 de dif +
+            * */
+
+          if (color != null) {
+            dataText.push({ x, y, text });
+            console.log(text, " : ", color)
+          } else {
+            console.log("je ne trouve pas pour : ", text);
+          }
         } else {
           // console.log("ça passe pas ", text);
         }
