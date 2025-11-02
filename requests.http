@@ -1,0 +1,7 @@
+### message pour la route de l'edt
+
+GET http://localhost:3000/edt
+
+### avoir l'edt
+
+GET http://localhost:3000/edt/1/1
