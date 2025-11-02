@@ -25,12 +25,10 @@ export class EdtService {
       const Fills = firstPage?.Fills;
 
       const tableCouleur = [
-        "#ffebff",
         "#b3ffff",
         "#9fff9f",
         "#ffbab3",
         "#ffff0c",
-        "#ffffa7",
         "#f23ea7"
       ]
 
