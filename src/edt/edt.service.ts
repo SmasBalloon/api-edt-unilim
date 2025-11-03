@@ -10,6 +10,7 @@ export class EdtService {
       y: number;
       xmax: number;
       ymax: number;
+      w: number;
       oc: string;
     }> = [];
     const dataText: Array<{
@@ -18,6 +19,7 @@ export class EdtService {
       text: string;
       color: string | null;
       heureDebut: string | null;
+      heureFin: string | null;
     }> = [];
     const dataHoraires: Array<{ x: number; y: number; heure: string }> = [];
 
@@ -42,7 +44,7 @@ export class EdtService {
       // --- Récupération des zones colorées ---
       for (const { x, y, h, w, oc } of Fills) {
         if (tableCouleur.includes(oc)) {
-          dataColor.push({ x, y, xmax: x + w, ymax: y + h, oc });
+          dataColor.push({ x, y, xmax: x + w, ymax: y + h, w, oc });
         }
       }
 
@@ -82,15 +84,29 @@ export class EdtService {
           if (matchedColors.length > 0) {
             matchedColors.sort((a, b) => Math.abs(a.y - y) - Math.abs(b.y - y));
             const color = matchedColors[0];
-
             // Cherche l'horaire avec x = color.x et y = 3.9779999999999998 (ligne des horaires)
             const matchedHoraire = dataHoraires.find(
               (h) =>
                 Math.abs(h.x - color.x) <= tolerance &&
                 Math.abs(h.y - 3.978) <= 0.01,
             );
-
+            // console.log(matchedHoraire);
             heureDebut = matchedHoraire ? matchedHoraire.heure : null;
+
+            const nombreHeure = Math.trunc(color.w / 0.0610333333) / 60;
+
+            // Calcul de l'heure de fin
+            let heureFin: string | null = null;
+            if (heureDebut) {
+              const parts = heureDebut.split(':');
+              const heures = Number(parts[0]);
+              const minutes = Number(parts[1]);
+              const totalMinutes = heures * 60 + minutes + nombreHeure * 60;
+              const heureFinH = Math.floor(totalMinutes / 60);
+              const heureFinM = Math.round(totalMinutes % 60);
+              heureFin = `${heureFinH}:${heureFinM.toString().padStart(2, '0')}`;
+            }
+
             console.log(
               text,
               ' : ',
@@ -101,11 +117,15 @@ export class EdtService {
               color.y,
               ' | Heure:',
               heureDebut,
+              " | nombre d'heure:",
+              nombreHeure,
+              ' | Heure fin:',
+              heureFin,
             );
-            dataText.push({ x, y, text, color: color.oc, heureDebut });
+            dataText.push({ x, y, text, color: color.oc, heureDebut, heureFin });
           } else {
             console.log('Aucune couleur trouvée pour :', text);
-            dataText.push({ x, y, text, color: null, heureDebut: null });
+            dataText.push({ x, y, text, color: null, heureDebut: null, heureFin: null });
           }
         }
       }
@@ -114,7 +134,7 @@ export class EdtService {
       console.log('\n=== Résultats finaux ===');
       dataText.forEach((item) => {
         console.log(
-          `${item.text} | Couleur: ${item.color} | Heure début: ${item.heureDebut}`,
+          `${item.text} | Couleur: ${item.color} | Heure début: ${item.heureDebut} | Heure fin: ${item.heureFin}`,
         );
       });
     });
