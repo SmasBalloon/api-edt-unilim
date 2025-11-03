@@ -80,7 +80,7 @@ export class EdtService {
 
           // --- Recherche de l'heure de début correspondante ---
           // L'heure a le même x que le bloc coloré (color.x)
-          let heureDebut = null;
+          let heureDebut: string | null = null;
           if (matchedColors.length > 0) {
             matchedColors.sort((a, b) => Math.abs(a.y - y) - Math.abs(b.y - y));
             const color = matchedColors[0];
@@ -122,10 +122,24 @@ export class EdtService {
               ' | Heure fin:',
               heureFin,
             );
-            dataText.push({ x, y, text, color: color.oc, heureDebut, heureFin });
+            dataText.push({
+              x,
+              y,
+              text,
+              color: color.oc,
+              heureDebut,
+              heureFin,
+            });
           } else {
             console.log('Aucune couleur trouvée pour :', text);
-            dataText.push({ x, y, text, color: null, heureDebut: null, heureFin: null });
+            dataText.push({
+              x,
+              y,
+              text,
+              color: null,
+              heureDebut: null,
+              heureFin: null,
+            });
           }
         }
       }
