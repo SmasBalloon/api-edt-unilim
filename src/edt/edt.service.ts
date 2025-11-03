@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import PDFParser from 'pdf2json';
+import fs from 'fs';
 const pdfParser = new PDFParser();
 
 @Injectable()
@@ -13,17 +14,20 @@ export class EdtService {
       w: number;
       oc: string;
     }> = [];
-    const dataText: Array<{
+    const dataCour: Array<{
       x: number;
       y: number;
       text: string;
       color: string | null;
       heureDebut: string | null;
       heureFin: string | null;
+      matchJour: { x: number; y: number; jour: string };
+      matchGroupe: { x: number; y: number; group: string };
+      matchSubGroupe?: { x: number; y: number; subgroup: string };
     }> = [];
     const dataHoraires: Array<{ x: number; y: number; heure: string }> = [];
     const dataJour: Array<{ x: number; y: number; jour: string }> = [];
-    const dataGroupe : Array<{ x: number; y:number; group: string }> = [];
+    const dataGroupe: Array<{ x: number; y: number; group: string }> = [];
 
     pdfParser.on('pdfParser_dataReady', (pdfData) => {
       const firstPage = pdfData?.Pages?.[0];
@@ -50,13 +54,19 @@ export class EdtService {
       }
 
       for (const { x, y, R } of Texts) {
-        const text = R?.[0]?.T;
+        let text = R?.[0]?.T;
         if (!text) continue;
+
+        // Décoder le texte (pdf2json encode les caractères spéciaux en URI)
+        text = decodeURIComponent(text);
+
         if (/^\s?\d{1,2}:\d{2}$/.test(text)) {
           // filtre les heures
           const heure = text.trim();
           dataHoraires.push({ x, y, heure });
-        } else if (/^(LUNDI|MARDI|MERCREDI|JEUDI|VENDREDI|SAMEDI)$/i.test(text)) {
+        } else if (
+          /^(LUNDI|MARDI|MERCREDI|JEUDI|VENDREDI|SAMEDI)$/i.test(text)
+        ) {
           // filtre les jours
           dataJour.push({ x, y, jour: text });
         } else if (/^G[0-9]$/.test(text)) {
@@ -64,10 +74,14 @@ export class EdtService {
           dataGroupe.push({ x, y, group: text });
         }
       }
+
       // --- Association des textes à leurs couleurs ET horaires ---
       for (const { x, y, R } of Texts) {
-        const text = R?.[0]?.T;
+        let text = R?.[0]?.T;
         if (!text) continue;
+
+        // Décoder le texte (pdf2json encode les caractères spéciaux en URI)
+        text = decodeURIComponent(text);
 
         // Filtre uniquement les blocs type "R1.01 - CE - 105"
         if (
@@ -80,6 +94,7 @@ export class EdtService {
           const matchGroupe = dataGroupe.reduce((prev, curr) =>
             Math.abs(curr.y - y) < Math.abs(prev.y - y) ? curr : prev,
           );
+
           // On cherche la couleur la plus proche en x (tolérance de 0.25)
           const tolerance = 0.25;
           const matchedColors = dataColor.filter(
@@ -118,52 +133,130 @@ export class EdtService {
               heureFin = `${heureFinH}:${heureFinM.toString().padStart(2, '0')}`;
             }
 
-            console.log(
-              text,
-              ' : ',
-              color.oc,
-              ' | x=',
-              color.x,
-              ' y=',
-              color.y,
-              ' | Heure:',
-              heureDebut,
-              " | nombre d'heure:",
-              nombreHeure,
-              ' | Heure fin:',
-              heureFin,
-              ' | jour du cour:',
-              matchJour.jour,
-              ' | groupe:',
-              matchGroupe.group,
-            );
+            // Ajouter "A" au groupe si la couleur est #b3ffff (TP)
+            let finalGroupe = matchGroupe.group;
+            if (color.oc === '#b3ffff') {
+              if (y > matchGroupe.y) {
+                finalGroupe = matchGroupe.group + 'A';
+              } else {
+                finalGroupe = matchGroupe.group + 'A';
+              }
+            }
 
-            dataText.push({
+
+
+            dataCour.push({
               x,
               y,
               text,
               color: color.oc,
               heureDebut,
               heureFin,
+              matchJour,
+              matchGroupe: { ...matchGroupe, group: finalGroupe },
             });
           } else {
-            console.log('Aucune couleur trouvée pour :', text);
-            dataText.push({
+            dataCour.push({
               x,
               y,
               text,
               color: null,
               heureDebut: null,
               heureFin: null,
+              matchJour,
+              matchGroupe,
             });
           }
         } else {
-          console.log('Aucune couleur trouvée pour :', text);
-          continue;
+          // Recherche de la couleur de fond même pour les textes non-cours
+          const tolerance = 0.25;
+          const matchedColors = dataColor.filter(
+            (c) =>
+              Math.abs(c.x - x) <= tolerance &&
+              y >= c.y - 0.5 &&
+              y <= c.ymax + 0.5,
+          );
+
+          let colorFound: string | null = null;
+          let color: {
+            x: number;
+            y: number;
+            xmax: number;
+            ymax: number;
+            w: number;
+            oc: string;
+          } | null = null;
+          let heureDebut: string | null = null;
+          let heureFin: string | null = null;
+
+          if (matchedColors.length > 0) {
+            matchedColors.sort((a, b) => Math.abs(a.y - y) - Math.abs(b.y - y));
+            color = matchedColors[0];
+            colorFound = color.oc;
+
+            // Cherche l'horaire avec x = color.x et y = 3.9779999999999998 (ligne des horaires)
+            const matchedHoraire = dataHoraires.find(
+              (h) =>
+                Math.abs(h.x - color.x) <= tolerance &&
+                Math.abs(h.y - 3.978) <= 0.01,
+            );
+            heureDebut = matchedHoraire ? matchedHoraire.heure : null;
+
+            const nombreHeure = Math.trunc(color.w / 0.0610333333) / 60;
+
+            // Calcul de l'heure de fin
+            if (heureDebut) {
+              const parts = heureDebut.split(':');
+              const heures = Number(parts[0]);
+              const minutes = Number(parts[1]);
+              const totalMinutes = heures * 60 + minutes + nombreHeure * 60;
+              const heureFinH = Math.floor(totalMinutes / 60);
+              const heureFinM = Math.round(totalMinutes % 60);
+              heureFin = `${heureFinH}:${heureFinM.toString().padStart(2, '0')}`;
+            }
+          }
+
+          if (colorFound === '#ffff0c' && color) {
+            const matchJour = dataJour.reduce((prev, curr) =>
+              Math.abs(curr.y - y) < Math.abs(prev.y - y) ? curr : prev,
+            );
+
+            const matchGroupe = {
+              x: color.x,
+              y: color.y,
+              group: 'All',
+            };
+
+            console.log(
+              text,
+              ' : ',
+              colorFound,
+              ' | Heure:',
+              heureDebut,
+              ' | Heure fin:',
+              heureFin,
+              ' | jour du cours:',
+              matchJour.jour,
+              ' | groupe:',
+              matchGroupe.group,
+            );
+
+            dataCour.push({
+              x,
+              y,
+              text,
+              color: colorFound,
+              heureDebut,
+              heureFin,
+              matchJour,
+              matchGroupe: matchGroupe,
+            });
+          }
         }
       }
     });
 
+    // fs.writeFileSync('./regardejson', JSON.stringify(dataCour));
     void pdfParser.loadPDF(desk);
   }
 
