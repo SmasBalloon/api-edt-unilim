@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import fs from "fs";
-
+import fs from 'fs';
 
 @Injectable()
 export class PdfDownloaderService {
@@ -17,7 +16,7 @@ export class PdfDownloaderService {
     console.log(`${dest} downloaded pdf`);
   }
 
-  public async deletePdf(dest:string): Promise<void> {
+  public async deletePdf(dest: string): Promise<void> {
     fs.rmSync(dest);
   }
 }

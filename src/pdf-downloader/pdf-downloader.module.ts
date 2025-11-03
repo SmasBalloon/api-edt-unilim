@@ -4,6 +4,6 @@ import { PdfDownloaderService } from './pdf-downloader.service.js';
 
 @Module({
   controllers: [PdfDownloaderController],
-  providers: [PdfDownloaderService]
+  providers: [PdfDownloaderService],
 })
-export class PdfDownloaderModule { }
+export class PdfDownloaderModule {}

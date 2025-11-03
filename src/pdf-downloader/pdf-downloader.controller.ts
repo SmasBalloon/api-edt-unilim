@@ -3,7 +3,7 @@ import { PdfDownloaderService } from './pdf-downloader.service.js';
 
 @Controller('pdf-downloader')
 export class PdfDownloaderController {
-  constructor(private readonly pdfDownloaderService: PdfDownloaderService) { }
+  constructor(private readonly pdfDownloaderService: PdfDownloaderService) {}
 
   @Get(':annee/:groupe')
   async DownloadPdf(
@@ -15,7 +15,7 @@ export class PdfDownloaderController {
     this.pdfDownloaderService.downloadPdf(pdfUrl, dest);
   }
 
-  @Delete(":annee")
+  @Delete(':annee')
   async deletePdf(@Param('annee') annee: number) {
     const dest = `./pdf/A${annee}_S9.pdf`;
     await this.pdfDownloaderService.deletePdf(dest);
