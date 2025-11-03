@@ -7,6 +7,7 @@ export class EdtService {
   GetEdt(annee: number, desk: string) {
     const dataColor = [];
     const dataText = [];
+    const dataHoraires = []; // Nouveau : stockage des horaires
 
     pdfParser.on('pdfParser_dataReady', (pdfData) => {
       const firstPage = pdfData?.Pages?.[0];
@@ -29,19 +30,31 @@ export class EdtService {
       // --- Récupération des zones colorées ---
       for (const { x, y, h, w, oc } of Fills) {
         if (tableCouleur.includes(oc)) {
-          dataColor.push({ x, y, w, h, oc });
+          dataColor.push({ x, y, xmax: x + w, ymax: y + h, oc });
         }
       }
 
-      // --- Association des textes à leurs couleurs ---
+      // --- Récupération des horaires (format HH:MM ou H:MM) ---
+      for (const { x, y, R } of Texts) {
+        const text = R?.[0]?.T;
+        if (!text) continue;
+
+        // Détecte les horaires : format "15:30", " 9:30", etc.
+        if (/^\s?\d{1,2}:\d{2}$/.test(text)) {
+          const heure = text.trim();
+          dataHoraires.push({ x, y, heure });
+        }
+      }
+
+      // --- Association des textes à leurs couleurs ET horaires ---
       for (const { x, y, R } of Texts) {
         const text = R?.[0]?.T;
         if (!text) continue;
 
         // Filtre uniquement les blocs type "R1.01 - CE - 105"
         if (/^[RS]\d+\.\d+ - ([A-Za-z0-9]+|\.) - ([A-Za-z0-9]+|\.)$/.test(text)) {
-          // On cherche la couleur la plus proche en x (tolérance de 0.26)
-          const tolerance = 0.26;
+          // On cherche la couleur la plus proche en x (tolérance de 0.25)
+          const tolerance = 0.25;
           const matchedColors = dataColor.filter(
             (c) =>
               Math.abs(c.x - x) <= tolerance && // tolérance horizontale
@@ -49,36 +62,33 @@ export class EdtService {
               y <= c.ymax + 0.5
           );
 
-          if (matchedColors.length === 0) {
-            console.log('Debug pour', text, '- x:', x, 'y:', y);
-            console.log('Colors proches:', dataColor.filter(c => Math.abs(c.x - x) <= tolerance));
-          }
-
+          // --- Recherche de l'heure de début correspondante ---
+          // L'heure a le même x que le bloc coloré (color.x)
+          let heureDebut = null;
           if (matchedColors.length > 0) {
-            // Choisit la plus proche en Y si plusieurs sont valides
             matchedColors.sort((a, b) => Math.abs(a.y - y) - Math.abs(b.y - y));
             const color = matchedColors[0];
 
-            // Cherche l'heure de début dans les Texts
-            const matchedHeureDebut = Texts.filter(
-              (t) =>
-                Math.abs(t.x - color.x) <= 0.26 && // même position x que color (avec tolérance)
-                Math.abs(t.y - 3.9779999999999998) <= 0.1 // y fixe (avec petite tolérance)
+            // Cherche l'horaire avec x = color.x et y = 3.9779999999999998 (ligne des horaires)
+            const matchedHoraire = dataHoraires.find(
+              (h) => Math.abs(h.x - color.x) <= tolerance && Math.abs(h.y - 3.978) <= 0.01
             );
-            matchedHeureDebut.sort((a, b) => a.x - b.x);
-            const heureDebut = matchedHeureDebut[0]?.R?.[0]?.T;
-            const heureFin = color.w * 1 / 0.06103333
-            console.log(heureFin)
-            // console.log(text, ' : ', color.oc, " et ", color.x , " ", color.y, " heure : ", heureDebut, " ", )
+
+            heureDebut = matchedHoraire ? matchedHoraire.heure : null;
+            console.log(text, ' : ', color.oc, " | x=", color.x, " y=", color.y, " | Heure:", heureDebut);
             dataText.push({ x, y, text, color: color.oc, heureDebut });
           } else {
             console.log('Aucune couleur trouvée pour :', text);
-            dataText.push({ x, y, text, color: null });
-            continue;
+            dataText.push({ x, y, text, color: null, heureDebut: null });
           }
         }
       }
-      // fs.writeFileSync("./debug_page.json", JSON.stringify(firstPage, null, 2), "utf8");
+
+      // Affichage final des résultats
+      console.log('\n=== Résultats finaux ===');
+      dataText.forEach((item) => {
+        console.log(`${item.text} | Couleur: ${item.color} | Heure début: ${item.heureDebut}`);
+      });
     });
 
     pdfParser.loadPDF(desk);
