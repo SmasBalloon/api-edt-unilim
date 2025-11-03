@@ -11,4 +11,4 @@ import { PdfDownloaderService } from './pdf-downloader/pdf-downloader.service.js
   controllers: [AppController, PdfDownloaderController],
   providers: [AppService, PdfDownloaderService],
 })
-export class AppModule { }
+export class AppModule {}
