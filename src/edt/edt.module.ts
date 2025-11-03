@@ -6,4 +6,4 @@ import { EdtService } from './edt.service.js';
   controllers: [EdtController],
   providers: [EdtService],
 })
-export class EdtModule { }
+export class EdtModule {}

@@ -5,9 +5,21 @@ const pdfParser = new PDFParser();
 @Injectable()
 export class EdtService {
   GetEdt(annee: number, desk: string) {
-    const dataColor = [];
-    const dataText = [];
-    const dataHoraires = []; // Nouveau : stockage des horaires
+    const dataColor: Array<{
+      x: number;
+      y: number;
+      xmax: number;
+      ymax: number;
+      oc: string;
+    }> = [];
+    const dataText: Array<{
+      x: number;
+      y: number;
+      text: string;
+      color: string | null;
+      heureDebut: string | null;
+    }> = [];
+    const dataHoraires: Array<{ x: number; y: number; heure: string }> = [];
 
     pdfParser.on('pdfParser_dataReady', (pdfData) => {
       const firstPage = pdfData?.Pages?.[0];
@@ -52,14 +64,16 @@ export class EdtService {
         if (!text) continue;
 
         // Filtre uniquement les blocs type "R1.01 - CE - 105"
-        if (/^[RS]\d+\.\d+ - ([A-Za-z0-9]+|\.) - ([A-Za-z0-9]+|\.)$/.test(text)) {
+        if (
+          /^[RS]\d+\.\d+ - ([A-Za-z0-9]+|\.) - ([A-Za-z0-9]+|\.)$/.test(text)
+        ) {
           // On cherche la couleur la plus proche en x (tolérance de 0.25)
           const tolerance = 0.25;
           const matchedColors = dataColor.filter(
             (c) =>
               Math.abs(c.x - x) <= tolerance && // tolérance horizontale
               y >= c.y - 0.5 && // marge verticale
-              y <= c.ymax + 0.5
+              y <= c.ymax + 0.5,
           );
 
           // --- Recherche de l'heure de début correspondante ---
@@ -71,11 +85,23 @@ export class EdtService {
 
             // Cherche l'horaire avec x = color.x et y = 3.9779999999999998 (ligne des horaires)
             const matchedHoraire = dataHoraires.find(
-              (h) => Math.abs(h.x - color.x) <= tolerance && Math.abs(h.y - 3.978) <= 0.01
+              (h) =>
+                Math.abs(h.x - color.x) <= tolerance &&
+                Math.abs(h.y - 3.978) <= 0.01,
             );
 
             heureDebut = matchedHoraire ? matchedHoraire.heure : null;
-            console.log(text, ' : ', color.oc, " | x=", color.x, " y=", color.y, " | Heure:", heureDebut);
+            console.log(
+              text,
+              ' : ',
+              color.oc,
+              ' | x=',
+              color.x,
+              ' y=',
+              color.y,
+              ' | Heure:',
+              heureDebut,
+            );
             dataText.push({ x, y, text, color: color.oc, heureDebut });
           } else {
             console.log('Aucune couleur trouvée pour :', text);
@@ -87,11 +113,13 @@ export class EdtService {
       // Affichage final des résultats
       console.log('\n=== Résultats finaux ===');
       dataText.forEach((item) => {
-        console.log(`${item.text} | Couleur: ${item.color} | Heure début: ${item.heureDebut}`);
+        console.log(
+          `${item.text} | Couleur: ${item.color} | Heure début: ${item.heureDebut}`,
+        );
       });
     });
 
-    pdfParser.loadPDF(desk);
+    void pdfParser.loadPDF(desk);
   }
 
   BonneUrl(): string {
