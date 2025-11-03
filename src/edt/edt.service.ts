@@ -22,6 +22,8 @@ export class EdtService {
       heureFin: string | null;
     }> = [];
     const dataHoraires: Array<{ x: number; y: number; heure: string }> = [];
+    const dataJour: Array<{ x: number; y: number; jour: string }> = [];
+    const dataGroupe : Array<{ x: number; y:number; group: string }> = [];
 
     pdfParser.on('pdfParser_dataReady', (pdfData) => {
       const firstPage = pdfData?.Pages?.[0];
@@ -29,17 +31,16 @@ export class EdtService {
         console.error('Aucune page trouvée dans le PDF.');
         return;
       }
+      const tableCouleur = [
+        '#b3ffff', // TP
+        '#9fff9f', // SAE
+        '#ffbab3', // TD
+        '#ffff0c', // Amphi
+        '#f23ea7', // Controle
+      ];
 
       const Fills = firstPage?.Fills || [];
       const Texts = firstPage?.Texts || [];
-
-      const tableCouleur = [
-        '#b3ffff', // TD
-        '#9fff9f', // TP
-        '#ffbab3', // CM
-        '#ffff0c', // Amphi
-        '#f23ea7', // Autre
-      ];
 
       // --- Récupération des zones colorées ---
       for (const { x, y, h, w, oc } of Fills) {
@@ -48,18 +49,21 @@ export class EdtService {
         }
       }
 
-      // --- Récupération des horaires (format HH:MM ou H:MM) ---
       for (const { x, y, R } of Texts) {
         const text = R?.[0]?.T;
         if (!text) continue;
-
-        // Détecte les horaires : format "15:30", " 9:30", etc.
         if (/^\s?\d{1,2}:\d{2}$/.test(text)) {
+          // filtre les heures
           const heure = text.trim();
           dataHoraires.push({ x, y, heure });
+        } else if (/^(LUNDI|MARDI|MERCREDI|JEUDI|VENDREDI|SAMEDI)$/i.test(text)) {
+          // filtre les jours
+          dataJour.push({ x, y, jour: text });
+        } else if (/^G[0-9]$/.test(text)) {
+          // filtre les groupes
+          dataGroupe.push({ x, y, group: text });
         }
       }
-
       // --- Association des textes à leurs couleurs ET horaires ---
       for (const { x, y, R } of Texts) {
         const text = R?.[0]?.T;
@@ -69,6 +73,13 @@ export class EdtService {
         if (
           /^[RS]\d+\.\d+ - ([A-Za-z0-9]+|\.) - ([A-Za-z0-9]+|\.)$/.test(text)
         ) {
+          const matchJour = dataJour.reduce((prev, curr) =>
+            Math.abs(curr.y - y) < Math.abs(prev.y - y) ? curr : prev,
+          );
+
+          const matchGroupe = dataGroupe.reduce((prev, curr) =>
+            Math.abs(curr.y - y) < Math.abs(prev.y - y) ? curr : prev,
+          );
           // On cherche la couleur la plus proche en x (tolérance de 0.25)
           const tolerance = 0.25;
           const matchedColors = dataColor.filter(
@@ -121,7 +132,12 @@ export class EdtService {
               nombreHeure,
               ' | Heure fin:',
               heureFin,
+              ' | jour du cour:',
+              matchJour.jour,
+              ' | groupe:',
+              matchGroupe.group,
             );
+
             dataText.push({
               x,
               y,
@@ -141,16 +157,11 @@ export class EdtService {
               heureFin: null,
             });
           }
+        } else {
+          console.log('Aucune couleur trouvée pour :', text);
+          continue;
         }
       }
-
-      // Affichage final des résultats
-      console.log('\n=== Résultats finaux ===');
-      dataText.forEach((item) => {
-        console.log(
-          `${item.text} | Couleur: ${item.color} | Heure début: ${item.heureDebut} | Heure fin: ${item.heureFin}`,
-        );
-      });
     });
 
     void pdfParser.loadPDF(desk);
