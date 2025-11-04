@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import PDFParser from 'pdf2json';
 import fs from 'fs';
+import { devNull } from 'node:os';
+
 const pdfParser = new PDFParser();
 
 @Injectable()
@@ -18,12 +20,14 @@ export class EdtService {
       x: number;
       y: number;
       text: string;
-      color: string | null;
+      ressource: string | null;
+      prof: string | null;
+      salle: string | null;
+      color: string;
       heureDebut: string | null;
       heureFin: string | null;
       matchJour: { x: number; y: number; jour: string };
       matchGroupe: { x: number; y: number; group: string };
-      matchSubGroupe?: { x: number; y: number; subgroup: string };
     }> = [];
     const dataHoraires: Array<{ x: number; y: number; heure: string }> = [];
     const dataJour: Array<{ x: number; y: number; jour: string }> = [];
@@ -143,28 +147,24 @@ export class EdtService {
               }
             }
 
-
+            // Extraire ressource, prof et salle du texte "R1.11 - JL - 112"
+            const parts = text.split(' - ');
+            const ressource = parts[0] || null;
+            const prof = parts[1] || null;
+            const salle = parts[2] || null;
 
             dataCour.push({
               x,
               y,
               text,
+              ressource,
+              prof,
+              salle,
               color: color.oc,
               heureDebut,
               heureFin,
               matchJour,
               matchGroupe: { ...matchGroupe, group: finalGroupe },
-            });
-          } else {
-            dataCour.push({
-              x,
-              y,
-              text,
-              color: null,
-              heureDebut: null,
-              heureFin: null,
-              matchJour,
-              matchGroupe,
             });
           }
         } else {
@@ -227,24 +227,13 @@ export class EdtService {
               group: 'All',
             };
 
-            console.log(
-              text,
-              ' : ',
-              colorFound,
-              ' | Heure:',
-              heureDebut,
-              ' | Heure fin:',
-              heureFin,
-              ' | jour du cours:',
-              matchJour.jour,
-              ' | groupe:',
-              matchGroupe.group,
-            );
-
             dataCour.push({
               x,
               y,
               text,
+              ressource: null,
+              prof: null,
+              salle: null,
               color: colorFound,
               heureDebut,
               heureFin,
@@ -254,9 +243,33 @@ export class EdtService {
           }
         }
       }
+
+      for (const {
+        x,
+        y,
+        ressource,
+        prof,
+        salle,
+        color,
+        heureDebut,
+        heureFin,
+        matchJour,
+        matchGroupe,
+      } of dataCour) {
+        console.log('─────────────────────────────────────────');
+        console.log('📚 Ressource:', ressource);
+        console.log('👨‍🏫 Prof:', prof);
+        console.log('🚪 Salle:', salle);
+        console.log('🎨 Couleur:', color);
+        console.log('🕐 Horaires:', heureDebut, '→', heureFin);
+        console.log('📅 Jour:', matchJour.jour);
+        console.log('👥 Groupe:', matchGroupe.group);
+        console.log('📍 Position: x=', x.toFixed(2), 'y=', y.toFixed(2));
+      }
+
+      // fs.writeFileSync('./regarde.json', JSON.stringify(dataCour));
     });
 
-    // fs.writeFileSync('./regardejson', JSON.stringify(dataCour));
     void pdfParser.loadPDF(desk);
   }
 
