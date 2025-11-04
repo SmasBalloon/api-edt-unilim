@@ -1,7 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import PDFParser from 'pdf2json';
-import fs from 'fs';
-import { devNull } from 'node:os';
 
 const pdfParser = new PDFParser();
 
@@ -217,8 +215,9 @@ export class EdtService {
           }
 
           if (colorFound === '#ffff0c' && color) {
+            // Utiliser le jour le plus proche de la zone colorée, pas du texte
             const matchJour = dataJour.reduce((prev, curr) =>
-              Math.abs(curr.y - y) < Math.abs(prev.y - y) ? curr : prev,
+              Math.abs(curr.y - color.y) < Math.abs(prev.y - color.y) ? curr : prev,
             );
 
             const matchGroupe = {
@@ -226,20 +225,68 @@ export class EdtService {
               y: color.y,
               group: 'All',
             };
+            // Identifier le type de texte
+            let ressource: string | null = null;
+            let prof: string | null = null;
+            let salle: string | null = null;
 
-            dataCour.push({
-              x,
-              y,
-              text,
-              ressource: null,
-              prof: null,
-              salle: null,
-              color: colorFound,
-              heureDebut,
-              heureFin,
-              matchJour,
-              matchGroupe: matchGroupe,
-            });
+            // Regex pour ressource : R1.04, R1.04 -, R1.04 R1.04 -, S1.01, etc.
+            if (/^[RS]\d+\.\d+(\s+[RS]\d+\.\d+)?\s*-?\s*$/.test(text.trim())) {
+              ressource = text.replace(/\s*-?\s*$/, '').trim();
+            }
+            // Regex pour salle : AmpC, AC, R47, R46, AmpA, AmpB, etc.
+            else if (/^(Amp[A-Z]|AC|R\d+|[A-Z]\d+)$/.test(text.trim())) {
+              salle = text.trim();
+            }
+            // Regex pour prof : contient un point ou une virgule (ex: Monédière T., AC)
+            else if (/[A-Z][a-z]+\s+[A-Z]\.?|^[A-Z]{2,}$/.test(text.trim())) {
+              prof = text.trim();
+            }
+            // Sinon, c'est probablement une matière (on l'ignore pour l'instant)
+
+            // Chercher si un cours existe déjà avec les mêmes horaires, jour et zone colorée proche
+            const existingCours = dataCour.find(
+              (cours) =>
+                cours.heureDebut === heureDebut &&
+                cours.heureFin === heureFin &&
+                cours.matchJour.jour === matchJour.jour &&
+                cours.color === colorFound &&
+                Math.abs(cours.matchGroupe.x - color.x) <= tolerance &&
+                y >= color.y - 0.5 &&
+                y <= color.ymax + 0.5,
+            );
+
+            if (existingCours) {
+              // Mettre à jour les valeurs null avec les nouvelles valeurs
+              if (ressource && !existingCours.ressource) {
+                existingCours.ressource = ressource;
+              }
+              if (prof && !existingCours.prof) {
+                existingCours.prof = prof;
+              }
+              if (salle && !existingCours.salle) {
+                existingCours.salle = salle;
+              }
+              // Ajouter le texte au texte existant s'il contient des infos utiles
+              if (!existingCours.text.includes(text)) {
+                existingCours.text += ' ' + text;
+              }
+            } else {
+              // Créer une nouvelle entrée si aucun cours correspondant n'existe
+              dataCour.push({
+                x,
+                y,
+                text,
+                ressource,
+                prof,
+                salle,
+                color: colorFound,
+                heureDebut,
+                heureFin,
+                matchJour,
+                matchGroupe: matchGroupe,
+              });
+            }
           }
         }
       }
@@ -266,8 +313,6 @@ export class EdtService {
         console.log('👥 Groupe:', matchGroupe.group);
         console.log('📍 Position: x=', x.toFixed(2), 'y=', y.toFixed(2));
       }
-
-      // fs.writeFileSync('./regarde.json', JSON.stringify(dataCour));
     });
 
     void pdfParser.loadPDF(desk);
