@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import PDFParser from 'pdf2json';
-
+import courses from '../../utils/dictinairies.js';
 const pdfParser = new PDFParser();
 
 @Injectable()
@@ -155,7 +155,7 @@ export class EdtService {
               x,
               y,
               text,
-              ressource,
+              ressource: courses[ressource],
               prof,
               salle,
               color: color.oc,
