@@ -217,7 +217,9 @@ export class EdtService {
           if (colorFound === '#ffff0c' && color) {
             // Utiliser le jour le plus proche de la zone colorée, pas du texte
             const matchJour = dataJour.reduce((prev, curr) =>
-              Math.abs(curr.y - color.y) < Math.abs(prev.y - color.y) ? curr : prev,
+              Math.abs(curr.y - color.y) < Math.abs(prev.y - color.y)
+                ? curr
+                : prev,
             );
 
             const matchGroupe = {
