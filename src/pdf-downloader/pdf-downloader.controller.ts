@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import { PdfDownloaderService } from './pdf-downloader.service.js';
 import fs from 'fs';
 
@@ -7,12 +7,12 @@ export class PdfDownloaderController {
   constructor(private readonly pdfDownloaderService: PdfDownloaderService) {}
 
   @Get(':annee')
-  DownloadPdf(@Param('annee') annee: string) {
+  async DownloadPdf(@Param('annee') annee: string) {
     const years = annee.replace('.pdf', ' ').split('_')[0];
     const pdfUrl = `https://edt-iut-info.unilim.fr/edt/${years}/${annee}`;
     const dest = `./pdf/${years}/${annee}`;
     if (!fs.existsSync(dest)) {
-      this.pdfDownloaderService.downloadPdf(pdfUrl, dest);
+      await this.pdfDownloaderService.downloadPdf(pdfUrl, dest);
     }
   }
 }

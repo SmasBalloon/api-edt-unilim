@@ -16,7 +16,7 @@ export class PdfDownloaderService {
     console.log(`${dest} downloaded pdf`);
   }
 
-  public async deletePdf(dest: string): Promise<void> {
+  public deletePdf(dest: string): void {
     fs.rmSync(dest);
   }
 }
