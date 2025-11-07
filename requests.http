@@ -7,4 +7,4 @@ GET http://localhost:3000/edt
 GET http://localhost:3000/edt/1/1
 
 ### ajouter une tache
-GET http://localhost:3000/pdf-watcher/
+GET http://localhost:3000/pdf-watcher/A1
